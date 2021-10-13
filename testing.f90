@@ -84,19 +84,19 @@ program testing
           real, parameter                   :: pi = 3.1415927
           real, parameter                   :: av_constant = 6.02214076E23 !! avogadros constant
           real, parameter                   :: H2_Cmax = (60*60) * 3.76E-17        !! mol_H2 cell^-1 s^-1
-        !!real, parameter                   :: H2_Cmax = 3.76E-10  * (60*60)       !! mol_H2 cell^-1 s^-1 
-          real, parameter                   :: cell_main = (60*60) * 2.16E-19      !! mol_ATP cell^-1 s^-1
-        !!real, parameter                   :: cell_growth  = 2.36E13      !! cells mol_ATP^-1
-          real, parameter                   :: cell_growth  = 4.237E-14    !! mole ATP to make a cell
+          real(16), parameter               :: cell_main = (60*60) * 2.16E-19      !! mol_ATP cell^-1 s^-1
+          real(16), parameter               :: cell_growth  = 4.237E-14    !! mole ATP to make a cell
           real, parameter                   :: death_starve = 2.5E-7       !! s^-1
           real, parameter                   :: death_other  = 1E-15        !! s^-1
           real, parameter                   :: protein_cell = 7.4E-15      !! mol_CH2O cell^-1
-          real, parameter                   :: ideal_T      = 283          !! 10 C ideal temp for now
+          real, parameter                   :: T_ideal      = 283          !! microbe ideal T
+          real, parameter                   :: T_sens       = 0.0          !! microbe sensivity to temperature
           real, parameter                   :: ATP_CH4      = 0.6          !! moles of ATP per moles of CH4 produced
           real, parameter                   :: ATP_H2       = 0.15
+          real, parameter                   :: H2_lim       = 0.0          !! lower bound of H2 consumption
           real, dimension(90)               :: lat                         !! lattitude points on globe
           real, dimension(144)              :: lon                         !! longitude points on globe
-          real, parameter                   :: t_array_length = 11         !! length of temeperature array, was 10001
+          integer, parameter                :: t_array_length = 10001      !! length of temeperature array, was 10001
           
           real, parameter                   :: planet_r = 6051.8E3         !! radius of planet
           real, parameter                   :: atmosphere_mass = 5.15E18   !! mass of the atmosphere
@@ -112,16 +112,14 @@ program testing
           real, parameter                   :: piston_vel_H2  = 1.3E-4     !! piston velocity for H2 at 25 degrees
           real, parameter                   :: solubility_H2  = 7.8E-4     !! solubility of H2 mol L^-1 bar^-1
 
-!!          real, parameter                   :: CO2_outflux_year_kg = 10E13 !! amount of CO2 added to atmosphere per year
-!!          real, parameter                   :: H2_outflux_year_kg  = 5E12  !! amount of H2 added to atmosphere per year
           real, parameter                   :: CO2_burial       = 0.001    !! % of CO2 removed from atmosphere per year
           real, parameter                   :: CH4_burial       = 0.001    !! % of CH4 removed from atmosphere per year
           real, parameter                   :: H2_burial        = 0.001    !! % of H2 removed from atmosphere per year
           real, parameter                   :: CO2_mole_weight  = 44.01    !! molar mass of CO2
           real, parameter                   :: CH4_mole_weight  = 16.043   !! molar mass of CH4
           real, parameter                   :: H2_mole_weight   = 2.01588  !! molar mass of H2
-          real                              :: CO2_outflux_year = 10E15   !! outflux in moles CO2 20x as much as current was 5.5E15  !! 15.5E15
-          !!real                              :: H2_outflux_year  = 11.48E16 !! outflux in moles H2
+          
+          real                              :: CO2_outflux_year = 10E15   !! outflux in moles CO2 20x as much as current was 5.5E  
           real                              :: H2_outflux_year  = 10E15     !! outflux in moles H2  was 5E13  !! 10E15
           
           real                              :: H2_pp, CH4_pp, CO2_pp, T    !! environment
@@ -151,8 +149,8 @@ program testing
           TYPE(Environment)                 :: atmosphere
           TYPE(Environment)                 :: ocean
           
-          real, dimension(10001,10001)      :: temp_array
-          real, dimension(10001)            :: CO2_array, CH4_array
+          real, dimension(t_array_length,t_array_length)      :: temp_array
+          real, dimension(t_array_length)            :: CO2_array, CH4_array
           integer                           :: i, j, n, t_step, IOStatus
           integer                           :: biotic_step
           integer                           :: d_step
@@ -181,8 +179,8 @@ program testing
 
 
           open(10, file="temperature_file.txt", status='old', action='read')
-          DO i = 1, 10001
-             read(10,*) (temp_array(j,i), j = 1,10001)
+          DO i = 1, t_array_length
+             read(10,*) (temp_array(j,i), j = 1,t_array_length)
           END DO
           close(10)
 
@@ -190,7 +188,7 @@ program testing
 
           open(30, file="data_random_"//trim(file_number)//".txt", status='replace', action='write')
 
-          DO i = 1, 10001
+          DO i = 1, t_array_length
              CO2_array(i) = 0.005 + 0.0000095  * (i-1)
              CH4_array(i) = 0.000001 * (i - 1)
           END DO
@@ -209,8 +207,8 @@ program testing
           CO2_MMR               = 0.0 !! atmosphere%CO2 / moles_air
           CH4_MMR               = 0.0 !! atmosphere%CH4 / moles_air
 
-          temp_value_CO2 = CO2_array_func(CO2_MMR, CO2_array)
-          temp_value_CH4 = CH4_array_func(CH4_MMR, CH4_array)
+          temp_value_CO2 = CO2_array_func(CO2_MMR, CO2_array, t_array_length)
+          temp_value_CH4 = CH4_array_func(CH4_MMR, CH4_array, t_array_length)
           
           !!print *, "temp_value_CO2", temp_value_CO2, "temp_value_CH4", temp_value_CH4
 
@@ -256,44 +254,44 @@ program testing
              CO2_MMR        = (atmosphere%CO2 + CO2_to_add) / moles_air
              CH4_MMR        = (atmosphere%CH4 + CH4_to_add) / moles_air
 
-             temp_value_CO2 = CO2_array_func(CO2_MMR, CO2_array)
-             temp_value_CH4 = CH4_array_func(CH4_MMR, CH4_array)
-!!$             IF (t_step .GT. 20624) THEN
-!!$                PRINT *, "co2 value error"
-!!$                PRINT *, atmosphere%CO2
-!!$                PRINT *, CO2_to_add
-!!$                PRINT *,  moles_air
-!!$                PRINT *, "ocean CO2"
-!!$                PRINT *, ocean%CO2
-!!$             END IF
-!!$              IF (t_step .GT. 20624) THEN
-!!$                PRINT *, "ch4 value error"
-!!$                PRINT *, atmosphere%CH4
-!!$                PRINT *, CH4_to_add
-!!$                PRINT *,  moles_air
-!!$                PRINT *, "Ocean CH4"
-!!$                PRINT *, ocean%CH4
-!!$                PRINT *, "atmosphere H2"
-!!$                PRINT *, atmosphere%H2
-!!$                PRINT *, "ocean H2"
-!!$                PRINT *, ocean%H2
-!!$                PRINT *, "listing vairables in order for CO2_to_add"
-!!$                PRINT *, CO2_burial
-!!$                PRINT *, atmosphere%CO2
-!!$                PRINT *, CH4_burial
-!!$                PRINT *, atmosphere%CH4
-!!$                PRINT *, CO2_outflux_year
-!!$                PRINT *, "t_step"
-!!$                PRINT *, t_step
-!!$                PRINT *, "population"
-!!$                PRINT *, species1%population
-!!$             END IF
-             
+             temp_value_CO2 = CO2_array_func(CO2_MMR, CO2_array, t_array_length)
+             temp_value_CH4 = CH4_array_func(CH4_MMR, CH4_array, t_array_length)
+             IF (temp_value_CO2 .LT. 1) THEN
+                PRINT *, "co2 value error"
+                PRINT *, atmosphere%CO2
+                PRINT *, CO2_to_add
+                PRINT *,  moles_air
+                PRINT *, "ocean CO2"
+                PRINT *, ocean%CO2
+             END IF
+              IF (temp_value_CO2 .LT. 1) THEN
+                PRINT *, "ch4 value error"
+                PRINT *, atmosphere%CH4
+                PRINT *, CH4_to_add
+                PRINT *,  moles_air
+                PRINT *, "Ocean CH4"
+                PRINT *, ocean%CH4
+                PRINT *, "atmosphere H2"
+                PRINT *, atmosphere%H2
+                PRINT *, "ocean H2"
+                PRINT *, ocean%H2
+                PRINT *, "listing vairables in order for CO2_to_add"
+                PRINT *, CO2_burial
+                PRINT *, atmosphere%CO2
+                PRINT *, CH4_burial
+                PRINT *, atmosphere%CH4
+                PRINT *, CO2_outflux_year
+                PRINT *, "t_step"
+                PRINT *, t_step
+                PRINT *, "population"
+                PRINT *, species1%population
+             END IF
+         
 
              atmosphere%eq_T = temp_array(temp_value_CO2, temp_value_CH4)
              atmosphere%T_increment = (atmosphere%eq_T - atmosphere%current_T) / step_length
 
-             IF ((seeded .EQ. 0) .AND. (ideal_T - 3 < atmosphere%current_T) .AND. (atmosphere%current_T < ideal_T + 3)) THEN
+             IF ((seeded .EQ. 0) .AND. (T_ideal - 3 < atmosphere%current_T) .AND. (atmosphere%current_T < T_ideal + 3)) THEN
                 habitable = 1
              END IF
              towrite_CO2 = atmosphere%CO2 / moles_air
@@ -363,15 +361,14 @@ program testing
                       starve_random = 1 + 0.02 * random_normal() !! adds noise to runs
                       !!write(30, *) starve_random
                       
-                      bug_starve = starve_random * num_bugs_starved(species1%ATP, species1%population)
-                      ATP_starve = starve_random * ATP_of_starved(species1%ATP, species1%population)
+                      bug_starve = starve_random * num_bugs_starved(species1%ATP, species1%population, cell_main)
 
                       !!print *, "starved pop", bug_starve
                       IF (bug_starve >= species1%population) THEN
                          ATP_starve = species1%ATP
                          bug_starve = species1%population
                       ELSE IF (bug_starve > 0) THEN
-                         ATP_starve = ATP_of_starved(species1%ATP, species1%population)
+                         ATP_starve = ATP_of_starved(species1%ATP, species1%population, cell_main)
                       ELSE
                          ATP_starve = 0
                          bug_starve = 0
@@ -387,12 +384,12 @@ program testing
                          repro_random = 1 + 0.02 * random_normal()
                          !!write(30, *) repro_random
                          
-                         new_bugs = repro_random * bugs_made(species1%ATP, species1%population)
+                         new_bugs = repro_random * bugs_made(species1%ATP, species1%population, cell_growth, cell_main)
                          IF (new_bugs < 1) THEN
                             new_bugs = 0
                          END IF
 
-                         fit_level = fitness(atmosphere%current_T, ocean%H2)
+                         fit_level = fitness(atmosphere%current_T, ocean%H2, H2_Cmax, H2_lim, T_ideal, T_sens)
 
                          max_H2 = H2_Cmax * fit_level * (species1%population - bug_starve)
 
@@ -407,15 +404,31 @@ program testing
                          IF (H2_growth .GT. max_H2) THEN
                             !!print *, "yes too many new bugs for amount of H2 we can eat"
                             !!new_bugs  = max_H2 / (2 * protein_cell * new_bugs * av_constant)
-                            new_bugs  = max_H2 / (2 * protein_cell * new_bugs)
+                            H2_growth =  max_H2
+                            new_bugs  = (H2_growth / 2.0) / protein_cell
                             !!print *, "updated new bugs", new_bugs
                             !!H2_growth =  2 * protein_cell * new_bugs * av_constant
-                            H2_growth =  2 * protein_cell * new_bugs
+                            !!2 * protein_cell * new_bugs
                          END IF
+
+!!$                         IF (H2_growth .GT. 2*ocean%CO2) THEN  !! do we have sufficient carbon dioxide for cells?
+!!$                            H2_growth = 2*ocean%CO2
+!!$                            new_bugs  = H2_growth / (2 * protein_cell * new_bugs)
+!!$                         END IF
+!!$
+!!$                         IF (4*(max_H2 - H2_growth) .GT. (ocean%CO2 - H2_growth/2.0)) THEN
+!!$                            !! function
+!!$                         END IF
+                         
 
                          ATP_used = new_bugs * cell_growth!! * av_constant !! atp used in creating new bugs
  
                          CO2_growth = protein_cell * new_bugs
+
+                         IF (CO2_growth + ((max_H2 - H2_growth) / 4.0) .GT. ocean%CO2) THEN
+                            PRINT *, "ERROR IN CO2 OCEAN"
+                         END IF
+                         
 
                          !!print *, new_bugs
                          ATP_made = (max_H2 - H2_growth) * ATP_H2 !! use rest of H2 for ATP production
@@ -455,10 +468,11 @@ program testing
           !!print *, "largest H2 poss",  huge(max_H2)
        contains
 
-       function grid_area(lo,la)
+       function grid_area(lo,la, planet_r)
           real :: grid_area, lo, la, alpha, u_angle, l_angle
           real, parameter  :: pi = 3.1415927
-          real, parameter  :: planet_r = 6051.8E3
+          !!real, parameter  :: planet_r = 6051.8E3
+          real :: planet_r
           real, parameter  :: num_longs = 144.0
           alpha = 2*pi*planet_r*planet_r
           u_angle = (pi/180)*(abs(la)+1)
@@ -466,11 +480,9 @@ program testing
           grid_area = (alpha/num_longs) * (sin(u_angle) - sin(l_angle))
         end function grid_area
 
-        function bugs_made(ATP, population) result(new_bugs)
+        function bugs_made(ATP, population, cell_growth, cell_main) result(new_bugs)
           real(16)            :: ATP, population, new_bugs, mu, sigma, d, a_r
-          !!real, parameter   :: av_constant = 6.02214076E23
-          real, parameter     :: cell_main = (60*60) * 2.16E-19
-          real, parameter     :: cell_growth = 4.237E-14
+          real(16)            :: cell_main, cell_growth
           a_r = (cell_growth + cell_main)
           !!print *, "in function pop", population
           !!print *, "in function ATP", ATP
@@ -486,24 +498,11 @@ program testing
           !!print *, "in function new bugs", new_bugs
         end function bugs_made
 
-        !!function bugs_made_ATP(ATP, population) result(ATP_used)
-        !!  real :: ATP, population, new_bugs, mu, sigma, d, a_r
-        !!  real(16), parameter :: av_constant = 6.02214076E23
-        !!  real, parameter     :: cell_main = 2.16E-19
-        !!  real, parameter     :: cell_growth = 4.237E-14
-        !!  a_r = (cell_growth  - cell_main) *av_constant
-        !!  mu = ATP / population
-        !!  sigma = 0.01 * mu
-        !!  d = (a_r - mu) / sigma
-        !!  ATP_used = 1.0 - 1.0*sigma * EXP(-0.5*d*d) / SQRT(2*pi) + (mu/2.0)*(1+(d/SQRT(d*d))*ERF( SQRT(0.5*d**2)))
-        !!  ATP_used = ATP_used * population
-        !!end function bugs_made_ATP
 
 
-        function ATP_of_starved(ATP, population) result(ATP_starve)
+        function ATP_of_starved(ATP, population, cell_main) result(ATP_starve)
           real(16) :: ATP, population, ATP_starve, mu, sigma, c
-          !!real, parameter :: av_constant = 6.02214076E23
-          real, parameter :: cell_main = (60*60) * 2.16E-19
+          real(16) :: cell_main
           real, parameter :: pi = 3.1415927
           mu = ATP / population
           !!print *, "mu", mu
@@ -526,16 +525,9 @@ program testing
           !!print *, "bug starve: ", bug_starve, "ATP starve: ", ATP_starve
         end function ATP_of_starved
 
-        function num_bugs_starved(ATP, population) result(bug_starve_out)
+        function num_bugs_starved(ATP, population, cell_main) result(bug_starve_out)
           real(16)          :: ATP, population, mu, sigma
-          !!real            :: filler
-          real(16)          :: bug_starve_out
-          !!real, parameter :: av_constant = 6.02214076E23
-          real, parameter :: cell_main = (60*60) * 2.16E-19
-          !!filler = 1.0d0
-          !!bug_starve_out = 1.0d0
-          !!print *, "huge(filler)", huge(filler)
-          !!print *, "huge(bug_starve_out)", huge(bug_starve_out)
+          real(16)          :: bug_starve_out, cell_main
           mu = ATP / population
           !!print *, "mu", mu
           !!print *, "maintaining", cell_main
@@ -559,15 +551,10 @@ program testing
         end function num_bugs_starved
         
           
-        function fitness(T, H2_pp) result(fitness_val)
-          real(16), parameter :: moles_air = 1.73E20 / 2.0
+        function fitness(T, H2_pp, H2_Cmax, H2_lim, T_ideal, T_sens) result(fitness_val)
           real(16)   :: H2_pp
           real :: T, H2, H2_fit, T_fit, factor_i, fitness_val
-          real, parameter :: H2_Cmax = 3.76E-17 * (60*60)           !! maximum consumption possible
-          real, parameter :: H2_lim  = 0                            !! minimum Pa of H2 required
-          real, parameter :: T_ideal = 283                          !! ideal temperature for microbes
-          real, parameter :: T_sens  = 0.5                          !! microbe sensitivity to temperature
-          !!print *, "H2PP", H2_pp, "H2_lim", H2_lim, "T", T
+          real ::  H2_lim, T_ideal, T_sens, H2_Cmax
           factor_i = T_sens * sqrt((T - T_ideal)**2)
           !!print *, "factor_i", factor_i
           T_fit = exp (-1.0 * (factor_i ** 2))
@@ -581,18 +568,17 @@ program testing
           !!print *, "fitness_val", fitness_val
         end function fitness
 
-        function CO2_array_func(CO2_MMR, CO2_array) result(temp_value_CO2)
+        function CO2_array_func(CO2_MMR, CO2_array,t_array_length) result(temp_value_CO2)
           real(16)               :: CO2_MMR
-          integer                :: max_val = 10001
-          real, dimension(10001) :: CO2_array
+          real, dimension(t_array_length) :: CO2_array
           real                   :: temp_value_CO2
-          integer                :: i
+          integer                :: i, t_array_length
           IF (CO2_MMR < CO2_array(1)) THEN
                 temp_value_CO2 = 1
-          ELSE IF (CO2_MMR > CO2_array(max_val)) THEN
-                temp_value_CO2 = max_val
+          ELSE IF (CO2_MMR > CO2_array(t_array_length)) THEN
+                temp_value_CO2 = t_array_length
           END IF
-          DO i = 1, max_val - 1
+          DO i = 1,  t_array_length - 1
              IF (CO2_array(i)  <= CO2_MMR .AND. CO2_MMR < CO2_array(i + 1)) THEN
                 temp_value_CO2 = i
              END IF
@@ -604,18 +590,18 @@ program testing
           END IF
         end function CO2_array_func
 
-        function CH4_array_func(CH4_MMR, CH4_array) result(temp_value_CH4)
+        function CH4_array_func(CH4_MMR, CH4_array, t_array_length) result(temp_value_CH4)
           real(16)                 :: CH4_MMR
-          integer                  :: max_val = 10001
-          real, dimension(10001)   :: CH4_array
+          !!integer                  :: max_val = 10001
+          real, dimension(t_array_length)   :: CH4_array
           real                     :: temp_value_CH4
-          integer                  :: i
+          integer                  :: i, t_array_length
           IF (CH4_MMR < CH4_array(1)) THEN
                 temp_value_CH4 = 1
-          ELSE IF (CH4_MMR > CH4_array(max_val)) THEN
-                temp_value_CH4 = max_val
+          ELSE IF (CH4_MMR > CH4_array(t_array_length)) THEN
+                temp_value_CH4 = t_array_length
           END IF
-          DO i = 1, max_val-1
+          DO i = 1,  t_array_length-1
              IF (CH4_array(i)  <= CH4_MMR .AND. CH4_MMR < CH4_array(i + 1)) THEN
                 temp_value_CH4 = i
              END IF
