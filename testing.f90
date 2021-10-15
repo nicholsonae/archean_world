@@ -84,23 +84,25 @@ program testing
           real, parameter                   :: pi = 3.1415927
           real, parameter                   :: av_constant = 6.02214076E23 !! avogadros constant
           real, parameter                   :: H2_Cmax = (60*60) * 3.76E-17        !! mol_H2 cell^-1 s^-1
-          real(16), parameter               :: cell_main = (60*60) * 2.16E-19      !! mol_ATP cell^-1 s^-1
-          real(16), parameter               :: cell_growth  = 4.237E-14    !! mole ATP to make a cell
+          real(16), parameter               :: cell_main = (60*60) * 2.16E-19  !! mol_ATP cell^-1 s^-1
+          real(16), parameter               :: cell_growth  = 2.0*4.237E-14    !! mole ATP to make a cell
           real, parameter                   :: death_starve = 2.5E-7       !! s^-1
           real, parameter                   :: death_other  = 1E-15        !! s^-1
           real, parameter                   :: protein_cell = 7.4E-15      !! mol_CH2O cell^-1
-          real, parameter                   :: T_ideal      = 283          !! microbe ideal T
+          real, parameter                   :: T_ideal      = 280 !!283          !! microbe ideal T
           real, parameter                   :: T_sens       = 0.0          !! microbe sensivity to temperature
           real, parameter                   :: ATP_CH4      = 0.6          !! moles of ATP per moles of CH4 produced
           real, parameter                   :: ATP_H2       = 0.15
           real, parameter                   :: H2_lim       = 0.0          !! lower bound of H2 consumption
+          real, parameter                   :: rand_dr      = 0.02         !! random death rate 2% currently
+          real, parameter                   :: add_rand     = 0.02         !! add randomness to the model
           real, dimension(90)               :: lat                         !! lattitude points on globe
           real, dimension(144)              :: lon                         !! longitude points on globe
           integer, parameter                :: t_array_length = 10001      !! length of temeperature array, was 10001
           
           real, parameter                   :: planet_r = 6051.8E3         !! radius of planet
           real, parameter                   :: atmosphere_mass = 5.15E18   !! mass of the atmosphere
-          real(16), parameter               :: moles_air = 1.73E20 * 0.5   !! moles of air in atmosphere
+          real(16), parameter               :: moles_air = 1.73E20 !!* 0.5   !! moles of air in atmosphere
           real(16), parameter               :: ocean_volume = 9.2E14       !! volume of 2m deep ocean in m^3
           real(16), parameter               :: ocean_surf_area = 4602.3E11 !! ocean surface area m^2
           real, parameter                   :: atmo_pressure = 1.0         !! atmopsheric pressure in bar in archean
@@ -256,6 +258,8 @@ program testing
 
              temp_value_CO2 = CO2_array_func(CO2_MMR, CO2_array, t_array_length)
              temp_value_CH4 = CH4_array_func(CH4_MMR, CH4_array, t_array_length)
+
+             
              IF (temp_value_CO2 .LT. 1) THEN
                 PRINT *, "co2 value error"
                 PRINT *, atmosphere%CO2
@@ -309,6 +313,13 @@ program testing
              DO biotic_step = 1, step_length !! years in hours
                 !!print *, "biotic_step", biotic_step, "population", species1%population
 
+!!$                IF (species1%population .GT. 0) THEN
+!!$                  write(20, *) t_step, atmosphere%current_T, species1%population, species1%ATP, &
+!!$                  H2_to_add, atmosphere%H2, atmosphere%CO2, atmosphere%CH4, ocean%H2, ocean%CO2, ocean%CH4, &
+!!$                  biotic_CH4_output, fit_level
+!!$                END IF
+                
+
                 !!temp_value_CO2 = CO2_array_func(CO2_MMR, CO2_array)
                 !!temp_value_CH4 = CH4_array_func(CH4_MMR, CH4_array)
                 !!atmosphere%eq_T = temp_array(temp_value_CO2, temp_value_CH4)
@@ -344,13 +355,18 @@ program testing
 
                 IF (species1%population .GT. 0) THEN
 
-                   death_random = 1 + 0.02 * random_normal()
+                   death_random = 1 + add_rand * (rand()*2 - 1)
+                   death_random = (1 - rand_dr) * death_random
+                   IF (death_random .GT. 1) THEN
+                      death_random = 1
+                   END IF
+                   
                    !!IF (death_random > 1) THEN
                    !!   death_random = 1
                    !!END IF
                    
-                   species1%population = species1%population * 0.98 * death_random
-                   species1%ATP        = species1%ATP        * 0.98 * death_random
+                   species1%population = species1%population * death_random !! * (1-rand_dr) 
+                   species1%ATP        = species1%ATP        * death_random !!* death_random !! * (1-rand_dr) 
 
                    IF (species1%population < 1) THEN
                       species1%population = 0
@@ -358,7 +374,7 @@ program testing
 
                    ELSE
 
-                      starve_random = 1 + 0.02 * random_normal() !! adds noise to runs
+                      starve_random = 1 + add_rand  * (rand()*2 - 1) !! adds noise to runs
                       !!write(30, *) starve_random
                       
                       bug_starve = starve_random * num_bugs_starved(species1%ATP, species1%population, cell_main)
@@ -381,7 +397,7 @@ program testing
                       !!ELSE
 
                          ATP_maintain = cell_main * (species1%population - bug_starve)
-                         repro_random = 1 + 0.02 * random_normal()
+                         repro_random = 1 + add_rand * (rand()*2 - 1)
                          !!write(30, *) repro_random
                          
                          new_bugs = repro_random * bugs_made(species1%ATP, species1%population, cell_growth, cell_main)
@@ -401,10 +417,10 @@ program testing
                          H2_growth =  2 * protein_cell * new_bugs
 
 
-                         IF (H2_growth .GT. max_H2) THEN
+                         IF (H2_growth .GT. (H2_Cmax * fit_level * new_bugs)) THEN
                             !!print *, "yes too many new bugs for amount of H2 we can eat"
                             !!new_bugs  = max_H2 / (2 * protein_cell * new_bugs * av_constant)
-                            H2_growth =  max_H2
+                            H2_growth =  H2_Cmax * fit_level * new_bugs
                             new_bugs  = (H2_growth / 2.0) / protein_cell
                             !!print *, "updated new bugs", new_bugs
                             !!H2_growth =  2 * protein_cell * new_bugs * av_constant
@@ -521,9 +537,31 @@ program testing
           ELSE IF (ATP_starve .GT. ATP) THEN
              ATP_starve = ATP
           END IF
-          !!print *, "in function ATP starve", ATP_starve
-          !!print *, "bug starve: ", bug_starve, "ATP starve: ", ATP_starve
         end function ATP_of_starved
+
+!!$        function ATP_of_repro(ATP, population, cell_growth, cell_main) result(ATP_repro)
+!!$          real(16) :: ATP, population, ATP_repro, mu, sigma, c
+!!$          real(16) :: cell_growth, cell_main
+!!$          real, parameter :: pi = 3.1415927
+!!$          mu = ATP / population
+!!$          !!print *, "mu", mu
+!!$          !!print *, "cell_main", cell_main
+!!$          !!print *, "in function ATP", ATP, "in function population", population, mu
+!!$          sigma = 0.1*cell_main*((mu/cell_main)**0.5) !!0.35 * mu!!0.3*cell_main !!1.0 !!mu / cell_main
+!!$          !!print *, "in function sigma", sigma
+!!$          c = (cell_growth - mu) / sigma
+!!$          !!print *, "in function c", c
+!!$          ATP_repro = -1.0*(sigma / SQRT(2*pi) )* EXP(-0.5*c**2)
+!!$          !!print *, "in function ATP starve first bit", ATP_starve
+!!$          ATP_repro = ATP_repro + (mu/2.0)*(1+ERF(c*SQRT(0.5)))
+!!$          ATP_repro = ATP_repro * population
+!!$          IF (ATP_repro .LT. 0) THEN
+!!$             ATP_repro = 0
+!!$          ELSE IF (ATP_repro .GT. ATP) THEN
+!!$             ATP_repro = ATP
+!!$          END IF
+!!$          ATP_repro = ATP - ATP_repro !! as we have calucated for ATP below this threshold
+!!$        end function ATP_of_repro
 
         function num_bugs_starved(ATP, population, cell_main) result(bug_starve_out)
           real(16)          :: ATP, population, mu, sigma
