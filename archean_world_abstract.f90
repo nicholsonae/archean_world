@@ -23,31 +23,17 @@ program archean_world
           real, parameter                   :: pi = 3.1415927
           real, parameter                   :: av_constant = 6.02214076E23 !! avogadros constant
           real, parameter                   :: molar_mass_CH2O = 30.0      !! molar mass of CH2O
-          real, parameter                   :: H2_diffusion_C = 7E15       !! mol H2 year^-1
 
-          real, parameter                   :: burial_rate = 0.1           !! % of CH2O buried
           real(16), parameter               :: H2_Cmax = (60*60) * 3.76E-17        !! mol_H2 cell^-1 s^-1
           real(16), parameter               :: CO2_Cmax = (60*60) * 0.5 * 3.76E-17        !! mol_H2 cell^-1 s^-1
           real, parameter                   :: energy_to_ATP = 32.5        !! kJ to make a mol of ATP
-          real, parameter                   :: CH2O_mass_cell_v = 0.5E6    !! dry CH2O g per cell volume (m^3)
-          real, parameter                   :: ATP_cost_gram_hour = 8.4E-4 !! cost of ATP per hour per dried gram weight
-          real, parameter                   :: cost_ATP_to_CH2O = 1.25 !!9.0      !! this needs a citation
-          real, parameter                   :: cell_radius = 1.0E-6        !! cell radius in m
-          
-          real(16)                          :: cell_volume
-          !!real(16)                          :: protein_cell
-          !!real(16)                          :: cell_main
-          !!real(16)                          :: cell_growth
 
           real(16), parameter               :: cell_main = 1.0 * (60*60) * 2.16E-19  !! mol_ATP cell^-1 s^-1 -19
-          real(16), parameter               :: protein_cell = 1.0 *7.4E-15      !! mol_CH2O cell^-1 
-          real(16), parameter               :: cell_growth  = 1.0 * 4.237E-14    !! mole ATP to make a cell
+          real(16), parameter               :: protein_cell = 1.0 *7.4E-15           !! mol_CH2O cell^-1 
+          real(16), parameter               :: cell_growth  = 1.0 * 4.237E-14        !! mole ATP to make a cell
           
-          
-          !!real, parameter                   :: death_starve = 2.5E-7       !! s^-1
-          !!real, parameter                   :: death_other  = 1E-15        !! s^-1
-          real, parameter                   :: T_ideal      = 283.0 !!283  !! microbe ideal T
-          real, parameter                   :: T_sens       = 0.0         !! microbe sensivity to temperature
+          real, parameter                   :: T_ideal      = 283.0        !! microbe ideal T
+          real, parameter                   :: T_sens       = 0.0          !! microbe sensivity to temperature
           real, parameter                   :: ATP_CH4      = 0.6          !! moles of ATP per moles of CH4 produced
           real, parameter                   :: ATP_H2       = 0.15
           real, parameter                   :: H2_lim       = 0.0          !! lower bound of H2 consumption
@@ -164,11 +150,6 @@ program archean_world
 
           ocean_volume = (4/3.0) * pi * ((planet_r + ocean_depth)**3 - planet_r**3 )
           ocean_surf_area = 4.0 * pi * (planet_r + ocean_depth)**2
-
-          !!cell_volume = (4/3.0) * pi * cell_radius**3
-          !!protein_cell = cell_volume * CH2O_mass_cell_v / molar_mass_CH2O
-          !!cell_main = ATP_cost_gram_hour * protein_cell * molar_mass_CH2O !! per hour
-          !!cell_growth = protein_cell * cost_ATP_to_CH2O
 
 
           
@@ -582,37 +563,7 @@ program archean_world
           G = -253 + 0.41*T + R*T*LOG(Q)
           G = -1.0 * G
           
-        end function delta_G
-        
-
-        function maxFluxH2(pi, cell_radius, ocean_H2, diffusion_H2, ocean_volume) result (H2_max_diff)
-          real       :: pi
-          real       :: cell_radius
-          real(16)   :: ocean_H2
-          real       :: diffusion_H2
-          real(16)   :: ocean_volume
-          real(16)   :: H2_max_diff
-
-          H2_max_diff = 4 * pi * cell_radius * diffusion_H2 * (ocean_H2 / ocean_volume)
-          H2_max_diff = H2_max_diff * 60 * 60
-
-        end function maxFluxH2
-
-
-        function maxFluxCO2(pi, cell_radius, ocean_CO2, diffusion_CO2, ocean_volume) result (CO2_max_diff)
-          real       :: pi
-          real       :: cell_radius
-          real(16)   :: ocean_CO2
-          real       :: diffusion_CO2
-          real(16)   :: ocean_volume
-          real(16)   :: CO2_max_diff
-
-          CO2_max_diff = 4 * pi * cell_radius * diffusion_CO2 * (ocean_CO2 / ocean_volume)
-          CO2_max_diff = CO2_max_diff * 60 * 60
-
-        end function maxFluxCO2
-        
-        
+        end function delta_G   
 
         function interpolate_temp(CO2MMR, CH4MMR, t_array_length, temp_array, CH4_array, CO2_array) &
              result(temperature)
